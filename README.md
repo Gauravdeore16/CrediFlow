@@ -64,7 +64,7 @@ cd backend
 mvn spring-boot:run
 ```
 - Backend runs at: `http://localhost:8080`
-- H2 Console available at: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:file:./data/loanspheredb`)
+- H2 Console available at: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:file:./data/crediflowdb`)
 
 ### 2. Start the Frontend (React.js)
 Open a terminal in `frontend/`:
@@ -80,7 +80,7 @@ npm run dev
 ## 📁 Project Structure
 
 ```
-LoanManagement/
+CrediFlow/
 ├── backend/
 │   ├── src/main/java/com/loansphere/
 │   │   ├── config/ (DataInitializer.java)
