@@ -1,0 +1,31 @@
+# Build & Dependency Directories
+node_modules/
+frontend/node_modules/
+backend/target/
+target/
+frontend/dist/
+dist/
+
+# Database & Data Files
+backend/data/
+data/
+*.mv.db
+*.trace.db
+
+# Uploaded Files
+backend/uploads/
+uploads/
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# OS System Files
+.DS_Store
+Thumbs.db
