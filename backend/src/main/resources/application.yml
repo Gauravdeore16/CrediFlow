@@ -29,7 +29,7 @@ spring:
       max-request-size: 10MB
 
 jwt:
-  secret: CrediFlowSuperSecretEncryptionKeyForJWTGeneration9876543210KeyMustBeLongEnough
+  secret: ${CREDIFLOW_JWT_SECRET}
   expiration: 86400000 # 24 hours in milliseconds
 
 file:

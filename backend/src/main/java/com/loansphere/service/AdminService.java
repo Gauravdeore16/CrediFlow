@@ -35,9 +35,6 @@ public class AdminService {
     private PaymentRepository paymentRepository;
 
     @Autowired
-    private EmiRepository emiRepository;
-
-    @Autowired
     private AuditLogRepository auditLogRepository;
 
     @Autowired

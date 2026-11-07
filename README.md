@@ -15,7 +15,7 @@ CrediFlow is an enterprise-grade full-stack loan management platform built with 
                                    REST / Axios
                                         |
                     +---------------------------------------+
-                    |    Spring Boot 3.2 Backend (Java 21)   |
+                    |    Spring Boot 3.5 Backend (Java 25)   |
                     |     Spring Security + JWT + JPA       |
                     +---------------------------------------+
                                    /    |    \
@@ -32,8 +32,8 @@ CrediFlow is an enterprise-grade full-stack loan management platform built with 
 
 | Role | Email | Password | Details |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin@crediflow.com` | `Admin@123` | Full system control, reports, officer creation |
-| **Loan Officer** | `officer@crediflow.com` | `Officer@123` | Document verification, loan approvals, disbursement |
+| **Admin** | `admin@crediflow.com` | `Admin@123` | System management, reports, officer creation, and loan approvals |
+| **Loan Officer** | `officer@crediflow.com` | `Officer@123` | Review applications, verify documents, approve/reject loans, and disburse approved loans |
 | **Customer** | `gaurav@example.com` | `Customer@123` | ₹45,000 monthly income, active disbursed loan |
 
 ---
@@ -58,7 +58,17 @@ $$EMI = P \times R \times \frac{(1 + R)^N}{(1 + R)^N - 1}$$
 ## 🛠️ How to Run the Application
 
 ### 1. Start the Backend (Spring Boot)
-Ensure Java 21 is installed. Open a terminal in `backend/`:
+Ensure Java 25 (the current LTS release) and Maven are installed. Generate a private JWT signing secret once, save it securely, and set the same value in each backend terminal. Never commit the secret:
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$env:CREDIFLOW_JWT_SECRET = [Convert]::ToBase64String($bytes)
+$rng.Dispose()
+```
+
+Then open a terminal in `backend/`:
 ```bash
 cd backend
 mvn spring-boot:run

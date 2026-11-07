@@ -40,7 +40,7 @@ public class DataInitializer implements CommandLineRunner {
     @Transactional
     public void run(String... args) throws Exception {
         // 1. Create Admin if not present
-        User adminUser = userRepository.findByEmail("admin@crediflow.com")
+        userRepository.findByEmail("admin@crediflow.com")
                 .or(() -> userRepository.findByEmail("admin@loansphere.com"))
                 .orElseGet(() -> {
                     User admin = new User("System Admin", "admin@crediflow.com", passwordEncoder.encode("Admin@123"), "9876543210", User.Role.ADMIN);

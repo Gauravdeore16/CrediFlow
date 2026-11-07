@@ -30,7 +30,7 @@ public class PaymentController {
     }
 
     @GetMapping("/api/payments/{id}")
-    public ResponseEntity<Payment> getPaymentById(@PathVariable Long id) {
+    public ResponseEntity<Payment> getPaymentById(@PathVariable long id) {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found with ID: " + id));
         return ResponseEntity.ok(payment);

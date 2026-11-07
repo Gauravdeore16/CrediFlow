@@ -11,9 +11,15 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [loans, setLoans] = useState([]);
 
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [loanApprovalOpen, setLoanApprovalOpen] = useState(false);
+  const [selectedLoan, setSelectedLoan] = useState(null);
+  const [loanApproval, setLoanApproval] = useState({});
+  const [loanApprovalLoading, setLoanApprovalLoading] = useState(false);
 
   // Officer Modal State
   const [officerModalOpen, setOfficerModalOpen] = useState(false);
@@ -33,19 +39,31 @@ const AdminDashboard = () => {
 
   const fetchAdminData = async () => {
     try {
-      const [statsRes, usersRes, productsRes, logsRes] = await Promise.all([
+      const responses = await Promise.allSettled([
         api.get('/admin/dashboard'),
         api.get('/admin/users'),
         api.get('/loan-products'),
-        api.get('/admin/audit-logs')
+        api.get('/admin/audit-logs'),
+        api.get('/officer/loans')
       ]);
 
-      setStats(statsRes.data);
-      setUsers(usersRes.data);
-      setProducts(productsRes.data);
-      setAuditLogs(logsRes.data);
-    } catch (err) {
-      console.error(err);
+      const failedRequests = [];
+      const applyResponse = (index, label, setter) => {
+        const response = responses[index];
+        if (response.status === 'fulfilled') {
+          setter(response.value.data);
+        } else {
+          console.error(`Failed to load admin ${label}`, response.reason);
+          failedRequests.push(label);
+        }
+      };
+
+      applyResponse(0, 'dashboard', setStats);
+      applyResponse(1, 'users', setUsers);
+      applyResponse(2, 'loan products', setProducts);
+      applyResponse(3, 'audit logs', setAuditLogs);
+      applyResponse(4, 'loan applications', setLoans);
+      setLoadError(failedRequests.length ? `Could not load: ${failedRequests.join(', ')}.` : '');
     } finally {
       setLoading(false);
     }
@@ -82,7 +100,45 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleOpenLoanApproval = (loan) => {
+    setSelectedLoan(loan);
+    setLoanApproval({
+      approvedAmount: loan.approvedAmount ?? loan.requestedAmount ?? '',
+      interestRate: loan.interestRate ?? loan.loanProduct?.interestRate ?? '',
+      tenureMonths: loan.tenureMonths ?? '',
+      processingFee: loan.processingFee ?? loan.loanProduct?.processingFee ?? '',
+      remarks: loan.remarks ?? ''
+    });
+    setLoanApprovalOpen(true);
+  };
+
+  const handleApproveLoan = async (e) => {
+    e.preventDefault();
+    if (!selectedLoan) return;
+
+    setLoanApprovalLoading(true);
+    try {
+      await api.put(`/officer/loans/${selectedLoan.id}/approve`, {
+        approvedAmount: loanApproval.approvedAmount === '' ? null : Number(loanApproval.approvedAmount),
+        interestRate: loanApproval.interestRate === '' ? null : Number(loanApproval.interestRate),
+        tenureMonths: loanApproval.tenureMonths === '' ? null : Number(loanApproval.tenureMonths),
+        processingFee: loanApproval.processingFee === '' ? null : Number(loanApproval.processingFee),
+        remarks: loanApproval.remarks
+      });
+      setLoanApprovalOpen(false);
+      await fetchAdminData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to approve loan');
+    } finally {
+      setLoanApprovalLoading(false);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-slate-400">Loading admin console...</div>;
+
+  const pendingLoanCount = loans.filter((loan) =>
+    ['SUBMITTED', 'UNDER_REVIEW', 'DOCUMENT_VERIFICATION'].includes(loan.status)
+  ).length;
 
   // Chart dataset preparation
   const statusChartData = stats ? [
@@ -100,6 +156,12 @@ const AdminDashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+          {loadError} Refresh the page to try again.
+        </div>
+      )}
+
       {/* Header */}
       <div className="glass-panel p-6 rounded-3xl border border-white/10 flex flex-wrap justify-between items-center gap-4 bg-gradient-to-r from-purple-950/30 via-slate-900 to-blue-950/30">
         <div>
@@ -108,6 +170,13 @@ const AdminDashboard = () => {
         </div>
 
         <div className="flex gap-3">
+          <button
+            onClick={() => setActiveTab('LOANS')}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg"
+          >
+            <FileText className="w-4 h-4" /> Review Loan Requests ({pendingLoanCount})
+          </button>
+
           <button
             onClick={() => setOfficerModalOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs flex items-center gap-2 shadow-lg"
@@ -136,7 +205,7 @@ const AdminDashboard = () => {
 
       {/* Navigation Tabs */}
       <div className="flex gap-2 border-b border-white/10 pb-4">
-        {['OVERVIEW', 'USERS', 'PRODUCTS', 'AUDIT_LOGS'].map((tab) => (
+        {['OVERVIEW', 'USERS', 'LOANS', 'PRODUCTS', 'AUDIT_LOGS'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -231,6 +300,58 @@ const AdminDashboard = () => {
         </div>
       )}
 
+      {activeTab === 'LOANS' && (
+        <div className="glass-panel p-6 rounded-3xl border border-white/10 space-y-4">
+          <div>
+            <h3 className="text-xl font-bold text-white">Customer Loan Applications</h3>
+            <p className="text-sm text-slate-400 mt-1">Review pending applications and approve loan terms.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/10 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  <th className="pb-3 px-4">Loan</th>
+                  <th className="pb-3 px-4">Customer</th>
+                  <th className="pb-3 px-4">Product</th>
+                  <th className="pb-3 px-4">Requested Amount</th>
+                  <th className="pb-3 px-4">Status</th>
+                  <th className="pb-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-sm">
+                {loans.map((loan) => {
+                  const canApprove = ['SUBMITTED', 'UNDER_REVIEW', 'DOCUMENT_VERIFICATION'].includes(loan.status);
+                  return (
+                    <tr key={loan.id} className="hover:bg-white/5 transition-colors">
+                      <td className="py-4 px-4 font-bold text-white">{loan.loanNumber}</td>
+                      <td className="py-4 px-4 text-slate-300">{loan.customer?.user?.name || 'N/A'}</td>
+                      <td className="py-4 px-4 text-slate-400">{loan.loanProduct?.productName || 'N/A'}</td>
+                      <td className="py-4 px-4 font-semibold text-emerald-400">₹{loan.requestedAmount?.toLocaleString()}</td>
+                      <td className="py-4 px-4"><Badge status={loan.status} /></td>
+                      <td className="py-4 px-4 text-right">
+                        {canApprove ? (
+                          <button
+                            onClick={() => handleOpenLoanApproval(loan)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold"
+                          >
+                            Approve
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-500">No action</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {loans.length === 0 && (
+                  <tr><td colSpan="6" className="py-8 text-center text-slate-400">No loan applications found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* TAB 3: LOAN PRODUCTS */}
       {activeTab === 'PRODUCTS' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -271,6 +392,46 @@ const AdminDashboard = () => {
       )}
 
       {/* Create Officer Modal */}
+      <Modal
+        isOpen={loanApprovalOpen}
+        onClose={() => setLoanApprovalOpen(false)}
+        title={selectedLoan ? `Approve Loan — ${selectedLoan.loanNumber}` : 'Approve Loan'}
+      >
+        {selectedLoan && (
+          <form onSubmit={handleApproveLoan} className="space-y-4 text-sm">
+            <p className="text-slate-300">
+              Applicant: <span className="font-bold text-white">{selectedLoan.customer?.user?.name}</span>
+              {' · '}Requested: <span className="font-bold text-white">₹{selectedLoan.requestedAmount?.toLocaleString()}</span>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs font-semibold text-slate-300">
+                Approved Amount (₹)
+                <input type="number" min="1" step="0.01" required value={loanApproval.approvedAmount ?? ''} onChange={(e) => setLoanApproval({ ...loanApproval, approvedAmount: e.target.value })} className="mt-1 w-full px-3 py-2 rounded-xl glass-input" />
+              </label>
+              <label className="text-xs font-semibold text-slate-300">
+                Interest Rate (% P.A.)
+                <input type="number" min="0" step="0.01" required value={loanApproval.interestRate ?? ''} onChange={(e) => setLoanApproval({ ...loanApproval, interestRate: e.target.value })} className="mt-1 w-full px-3 py-2 rounded-xl glass-input" />
+              </label>
+              <label className="text-xs font-semibold text-slate-300">
+                Tenure (months)
+                <input type="number" min="1" step="1" required value={loanApproval.tenureMonths ?? ''} onChange={(e) => setLoanApproval({ ...loanApproval, tenureMonths: e.target.value })} className="mt-1 w-full px-3 py-2 rounded-xl glass-input" />
+              </label>
+              <label className="text-xs font-semibold text-slate-300">
+                Processing Fee (%)
+                <input type="number" min="0" step="0.01" required value={loanApproval.processingFee ?? ''} onChange={(e) => setLoanApproval({ ...loanApproval, processingFee: e.target.value })} className="mt-1 w-full px-3 py-2 rounded-xl glass-input" />
+              </label>
+            </div>
+            <label className="block text-xs font-semibold text-slate-300">
+              Remarks
+              <textarea rows="3" value={loanApproval.remarks ?? ''} onChange={(e) => setLoanApproval({ ...loanApproval, remarks: e.target.value })} className="mt-1 w-full px-3 py-2 rounded-xl glass-input" />
+            </label>
+            <button type="submit" disabled={loanApprovalLoading} className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold">
+              {loanApprovalLoading ? 'Approving...' : 'Confirm Approval'}
+            </button>
+          </form>
+        )}
+      </Modal>
+
       <Modal isOpen={officerModalOpen} onClose={() => setOfficerModalOpen(false)} title="Register Loan Officer">
         <form onSubmit={handleCreateOfficer} className="space-y-4 text-sm">
           <div><label className="block text-xs font-bold text-slate-300 mb-1">Full Name</label><input type="text" required value={officerData.name} onChange={(e) => setOfficerData({ ...officerData, name: e.target.value })} className="w-full px-3 py-2 rounded-xl glass-input" placeholder="Rajesh Kumar" /></div>

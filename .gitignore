@@ -29,3 +29,8 @@ uploads/
 # OS System Files
 .DS_Store
 Thumbs.db
+
+# Local environment variables
+.env
+.env.*
+!.env.example

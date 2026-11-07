@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class LoanService {
@@ -41,9 +40,6 @@ public class LoanService {
 
     @Autowired
     private AuditLogRepository auditLogRepository;
-
-    @Autowired
-    private EligibilityService eligibilityService;
 
     @Transactional
     public Loan applyForLoan(String userEmail, LoanApplicationRequest request) {
@@ -115,16 +111,22 @@ public class LoanService {
     @Transactional
     public Loan verifyApplication(Long loanId, String officerEmail, String remarks) {
         Loan loan = getLoanById(loanId);
-        LoanOfficer officer = officerRepository.findByUserEmail(officerEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Officer profile not found"));
+        User reviewer = userRepository.findByEmail(officerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Reviewer not found"));
+        LoanOfficer officer = officerRepository.findByUserEmail(officerEmail).orElse(null);
 
-        loan.setOfficer(officer);
+        if (reviewer.getRole() == User.Role.OFFICER && officer == null) {
+            throw new ResourceNotFoundException("Officer profile not found");
+        }
+        if (officer != null) {
+            loan.setOfficer(officer);
+        }
         loan.setStatus(Loan.LoanStatus.DOCUMENT_VERIFICATION);
         loan.setRemarks(remarks);
         loan = loanRepository.save(loan);
 
         auditLogRepository.save(new AuditLog(
-                officerEmail, "OFFICER", "VERIFY_DOCUMENT", "Loan", loan.getId(),
+                officerEmail, reviewer.getRole().name(), "VERIFY_DOCUMENT", "Loan", loan.getId(),
                 "Loan " + loan.getLoanNumber() + " documents put under verification."
         ));
 
@@ -134,10 +136,13 @@ public class LoanService {
     @Transactional
     public Loan approveLoan(Long loanId, String officerEmail, LoanApprovalRequest request) {
         Loan loan = getLoanById(loanId);
-        LoanOfficer officer = officerRepository.findByUserEmail(officerEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Officer profile not found"));
+        User approver = userRepository.findByEmail(officerEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Approver not found"));
+        LoanOfficer officer = officerRepository.findByUserEmail(officerEmail).orElse(null);
 
-        loan.setOfficer(officer);
+        if (officer != null) {
+            loan.setOfficer(officer);
+        }
         loan.setStatus(Loan.LoanStatus.APPROVED);
         loan.setApprovalDate(LocalDate.now());
 
@@ -166,7 +171,7 @@ public class LoanService {
         loan = loanRepository.save(loan);
 
         auditLogRepository.save(new AuditLog(
-                officerEmail, "OFFICER", "APPROVE_LOAN", "Loan", loan.getId(),
+                officerEmail, approver.getRole().name(), "APPROVE_LOAN", "Loan", loan.getId(),
                 "Approved loan " + loan.getLoanNumber() + " for ₹" + loan.getApprovedAmount()
         ));
 

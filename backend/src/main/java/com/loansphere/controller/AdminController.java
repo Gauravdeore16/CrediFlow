@@ -1,9 +1,12 @@
 package com.loansphere.controller;
 
 import com.loansphere.entity.AuditLog;
+import com.loansphere.entity.Loan;
 import com.loansphere.entity.LoanOfficer;
 import com.loansphere.entity.User;
+import com.loansphere.dto.LoanApprovalRequest;
 import com.loansphere.service.AdminService;
+import com.loansphere.service.LoanService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +24,9 @@ public class AdminController {
 
     @Autowired
     private AdminService adminService;
+
+    @Autowired
+    private LoanService loanService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<Map<String, Object>> getAdminDashboard() {
@@ -55,5 +61,18 @@ public class AdminController {
     @GetMapping("/audit-logs")
     public ResponseEntity<List<AuditLog>> getAuditLogs() {
         return ResponseEntity.ok(adminService.getAuditLogs());
+    }
+
+    @GetMapping("/loans")
+    public ResponseEntity<List<Loan>> getLoans() {
+        return ResponseEntity.ok(loanService.getAllLoans());
+    }
+
+    @PutMapping("/loans/{id}/approve")
+    public ResponseEntity<Loan> approveLoan(
+            @PathVariable Long id,
+            @RequestBody LoanApprovalRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(loanService.approveLoan(id, authentication.getName(), request));
     }
 }
